@@ -1,0 +1,6 @@
+{
+  "name": "Poop Fly",
+  "description": "A procedurally generated 2D side-scrolling game. Help the fly survive by eating, pooping on enemies, and navigating through various levels.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
