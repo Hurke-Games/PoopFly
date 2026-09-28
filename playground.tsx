@@ -23,6 +23,8 @@ export class Playground extends LitElement {
     this.previewFrame.classList.add('preview-iframe');
     this.previewFrame.setAttribute('allowTransparency', 'true');
     this.previewFrame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+    this.previewFrame.setAttribute('allowfullscreen', 'true');
+    this.previewFrame.setAttribute('allow', 'fullscreen');
   }
 
   /** Disable shadow DOM */
