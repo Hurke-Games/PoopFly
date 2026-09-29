@@ -1014,23 +1014,48 @@ class AtticBox extends LevelObject {
     }
 }
 
-// Attic Wooden Beam
+// Attic Wooden Beam (Hanging rafter or floor post with generous fly-through clearance)
 class WoodenBeam extends LevelObject {
-    constructor(x) {
-        super(x, height, 36, height, '#451a03');
+    constructor(x, isHanging = true) {
+        const beamH = random(110, 140);
+        const beamY = isHanging ? beamH : height;
+        super(x, beamY, 36, beamH, '#451a03');
+        this.isHanging = isHanging;
     }
     draw() {
         let screenX = this.x - scrollX;
         fill(69, 26, 3);
-        rect(screenX, 0, this.w, this.h);
-        // Steel bracket plate with bolts
-        fill(100, 116, 139);
-        rect(screenX - 4, height * 0.45, this.w + 8, 40, 2);
-        fill(15, 23, 42);
-        ellipse(screenX + 6, height * 0.45 + 10, 5, 5);
-        ellipse(screenX + this.w - 6, height * 0.45 + 10, 5, 5);
-        ellipse(screenX + 6, height * 0.45 + 30, 5, 5);
-        ellipse(screenX + this.w - 6, height * 0.45 + 30, 5, 5);
+        if (this.isHanging) {
+            // Hanging rafter from ceiling
+            rect(screenX, 0, this.w, this.h, 0, 0, 4, 4);
+            // Steel bracket at ceiling
+            fill(100, 116, 139);
+            rect(screenX - 4, 0, this.w + 8, 22, 2);
+            fill(15, 23, 42);
+            ellipse(screenX + 6, 11, 4, 4);
+            ellipse(screenX + this.w - 6, 11, 4, 4);
+            // Wood grain lines
+            stroke(45, 18, 2);
+            strokeWeight(1.5);
+            line(screenX + 12, 22, screenX + 12, this.h - 8);
+            line(screenX + 24, 22, screenX + 24, this.h - 14);
+            noStroke();
+        } else {
+            // Pillar post rising from floor
+            rect(screenX, this.y - this.h, this.w, this.h, 4, 4, 0, 0);
+            // Steel floor bracket plate
+            fill(100, 116, 139);
+            rect(screenX - 4, this.y - 20, this.w + 8, 20, 2);
+            fill(15, 23, 42);
+            ellipse(screenX + 6, this.y - 10, 4, 4);
+            ellipse(screenX + this.w - 6, this.y - 10, 4, 4);
+            // Wood grain lines
+            stroke(45, 18, 2);
+            strokeWeight(1.5);
+            line(screenX + 12, this.y - this.h + 8, screenX + 12, this.y - 20);
+            line(screenX + 24, this.y - this.h + 14, screenX + 24, this.y - 20);
+            noStroke();
+        }
     }
 }
 
@@ -1399,10 +1424,11 @@ const levelConfigs = {
                 levelObjects.push(box);
                 return box.w + 380;
             } else if (step === 1) {
-                // Wooden support beam with space to fly around
-                const beam = new WoodenBeam(worldX);
+                // Wooden support beam (alternating hanging rafter vs floor post with wide flight corridor)
+                let isHanging = (levelStepIndices[4] % 2 === 0);
+                const beam = new WoodenBeam(worldX, isHanging);
                 levelObjects.push(beam);
-                return beam.w + 400;
+                return beam.w + 420;
             } else {
                 // Dusty cobweb in corner
                 backgroundObjects.push(new Cobweb(worldX));

@@ -63,6 +63,11 @@ function renderWebsite(rootElement: HTMLElement) {
                 <span class="bezel-title">POOP FLY • PROCEDURAL SURVIVAL ARCADE</span>
               </div>
               <div class="bezel-actions">
+                <div class="bezel-score-badge" title="All-time best score saved in browser">
+                  <span class="score-trophy">🏆</span>
+                  <span class="score-label">BEST:</span>
+                  <span id="bezel-best-val" class="score-number">0</span>
+                </div>
                 <button id="restart-btn" class="bezel-btn" title="Reload Game">
                   ⟳ Restart
                 </button>
@@ -80,7 +85,7 @@ function renderWebsite(rootElement: HTMLElement) {
             <!-- Bottom Arcade Bezel -->
             <div class="cabinet-bezel-bottom">
               <div class="bezel-hint">
-                <span>💡 <strong>Menu Tip:</strong> Checkbox in start menu toggles between Mouse and Keyboard controls.</span>
+                <span>💡 <strong>Multiplier Tip:</strong> Explore all 7 areas to multiply your final score by 7x at the end! All-time best score is saved automatically.</span>
               </div>
               <div class="bezel-shortcuts">
                 <span>Click <strong>⛶ Fullscreen</strong> for the complete arcade cabinet view (Press <strong>Esc</strong> to exit)</span>
@@ -101,9 +106,9 @@ function renderWebsite(rootElement: HTMLElement) {
               <p>Pilot with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>Arrow</kbd> keys. Press <kbd>Space</kbd> to poop. Mouse pointer won't pull you off course!</p>
             </div>
             <div class="control-card">
-              <div class="card-icon">⏱️</div>
-              <h3>Survival Bonus</h3>
-              <p>Earn <strong>+10 score</strong> for every second alive! Replenish stamina by eating snacks and cakes scattered across each room.</p>
+              <div class="card-icon">🗺️</div>
+              <h3>Area Multiplier & Best Score</h3>
+              <p>Discover rooms! At the end, your score is <strong>multiplied by the number of areas found (up to 7x)</strong>. Your best score is permanently saved!</p>
             </div>
           </div>
         </section>
@@ -288,6 +293,30 @@ function initGame() {
       playground.setCode(GAME_CODE);
     });
   }
+
+  // Best Score Tracker Sync
+  const bestScoreVal = document.getElementById('bezel-best-val');
+  function updateSiteBestScore(score?: number) {
+    let s = score;
+    if (s === undefined) {
+      try {
+        const stored = localStorage.getItem('poopfly_best_score');
+        s = stored ? parseInt(stored, 10) || 0 : 0;
+      } catch (e) {
+        s = 0;
+      }
+    }
+    if (bestScoreVal) {
+      bestScoreVal.textContent = s.toLocaleString();
+    }
+  }
+  updateSiteBestScore();
+
+  window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'POOPFLY_BEST_SCORE_UPDATE') {
+      updateSiteBestScore(event.data.bestScore);
+    }
+  });
 }
 
 if (document.readyState === 'loading') {

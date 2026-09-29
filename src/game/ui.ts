@@ -39,7 +39,12 @@ let survivalSeconds = 0;
 function resetGame() {
     fly = new Fly();
     score = 0;
+    baseScore = 0;
+    finalScore = 0;
+    areasMultiplier = 1;
+    isNewBestScore = false;
     survivalSeconds = 0;
+    discoveredAreas = new Set([1]);
     changeLevel(1, true);
 }
 
@@ -50,7 +55,25 @@ function startGame() {
 }
 
 function gameOver() {
+    if (gameState === 'GAME_OVER') return;
     gameState = 'GAME_OVER';
+
+    // Calculate base score and multiply by total areas discovered at the end
+    baseScore = score;
+    let areasFound = (typeof discoveredAreas !== 'undefined' && discoveredAreas.size > 0)
+        ? discoveredAreas.size
+        : (new Set(levelHistory).size || 1);
+    areasMultiplier = Math.max(1, areasFound);
+    finalScore = baseScore * areasMultiplier;
+    score = finalScore; // The final multiplied score
+
+    // Update and persist all-time best score
+    if (finalScore > bestScore) {
+        saveBestScore(finalScore);
+        isNewBestScore = true;
+    } else {
+        isNewBestScore = false;
+    }
 }
 
 let layoutState = {
@@ -89,8 +112,20 @@ function changeLevel(level, isFirstLoad = false) {
 
     if (!isFirstLoad) {
         levelHistory.push(level);
+        if (typeof discoveredAreas !== 'undefined') {
+            let wasNew = !discoveredAreas.has(level);
+            discoveredAreas.add(level);
+            if (wasNew) {
+                let px = (typeof fly !== 'undefined' && fly) ? fly.x : width / 2;
+                let py = (typeof fly !== 'undefined' && fly) ? fly.y - 25 : height / 2;
+                scorePopups.push(new ScorePopup(px, py, "🗺️ NEW AREA! (x" + discoveredAreas.size + " MULTIPLIER)", '#facc15'));
+            }
+        }
     } else {
         levelHistory = [1];
+        if (typeof discoveredAreas !== 'undefined') {
+            discoveredAreas = new Set([1]);
+        }
     }
 
     const config = levelConfigs[currentLevel];
@@ -296,6 +331,12 @@ function keyPressed() {
         } else if (gameState === 'TRANSITION' && activeTransition) {
             // Fast skip transition
             activeTransition.timer = activeTransition.duration - 2;
+        } else if (gameState === 'GAME_OVER') {
+            startGame();
+        }
+    } else if (keyCode === 13) { // ENTER
+        if (gameState === 'GAME_OVER' || gameState === 'MENU') {
+            startGame();
         }
     }
 }
@@ -353,11 +394,12 @@ function drawUI() {
     textAlign(LEFT, CENTER);
     text(\`ENERGY: \${Math.ceil(fly.energy)}%\`, barX + 12, barY + barH / 2);
 
-    // 2. Center Location Badge
+    // 2. Center Location & Area Discovery Multiplier Badge
     let locName = levelConfigs[currentLevel] ? levelConfigs[currentLevel].name : 'ZONE';
-    let locW = 200;
+    let areasCount = (typeof discoveredAreas !== 'undefined') ? discoveredAreas.size : 1;
+    let locW = 320;
     let locX = width / 2 - locW / 2;
-    fill(15, 23, 42, 210);
+    fill(15, 23, 42, 215);
     stroke(100, 116, 139, 150);
     strokeWeight(1);
     rect(locX, barY - 2, locW, 26, 6);
@@ -365,22 +407,23 @@ function drawUI() {
     noStroke();
     fill(250, 204, 21);
     textAlign(CENTER, CENTER);
-    textSize(13);
+    textSize(12);
     textStyle(BOLD);
-    text(\`📍 \${locName.toUpperCase()}\`, width / 2, barY + 11);
+    text("📍 " + locName.toUpperCase() + "  •  🗺️ AREAS: " + areasCount + "/7 (x" + areasCount + ")", width / 2, barY + 11);
 
-    // 3. Scoreboard (Top Right) with Survival Timer
-    fill(15, 23, 42, 210);
+    // 3. Scoreboard (Top Right) with Current Score, All-Time Best Score & Survival Timer
+    let scoreW = 285;
+    fill(15, 23, 42, 215);
     stroke(100, 116, 139, 150);
     strokeWeight(1);
-    rect(width - 230, barY - 2, 210, 26, 6);
+    rect(width - scoreW - 20, barY - 2, scoreW, 26, 6);
 
     noStroke();
     fill(255);
     textAlign(RIGHT, CENTER);
-    textSize(13);
+    textSize(12);
     textStyle(BOLD);
-    text(\`SCORE: \${score}   ⏱ \${survivalSeconds}s\`, width - 30, barY + 11);
+    text("SCORE: " + score + "   🏆 BEST: " + bestScore + "   ⏱ " + survivalSeconds + "s", width - 30, barY + 11);
 
     // 4. Subtle Controls Hint (Bottom Left)
     fill(255, 255, 255, 140);
@@ -388,8 +431,8 @@ function drawUI() {
     textStyle(NORMAL);
     textAlign(LEFT, BOTTOM);
     let hudTip = controlScheme === 'MOUSE'
-        ? "CONTROL: [MOUSE] Move cursor to fly  •  Click or Space: Poop (+10 pts/sec)"
-        : "CONTROL: [KEYBOARD] WASD / Arrows to fly  •  Spacebar: Poop (+10 pts/sec)";
+        ? "CONTROL: [MOUSE] Move cursor to fly  •  Click or Space: Poop  •  Explore rooms for end multiplier!"
+        : "CONTROL: [KEYBOARD] WASD / Arrows to fly  •  Spacebar: Poop  •  Explore rooms for end multiplier!";
     text(hudTip, 20, height - 12);
 
     pop();
@@ -413,15 +456,21 @@ function drawMenu() {
 
     // Game Title with Shadow
     textAlign(CENTER, TOP);
-    textSize(44);
+    textSize(42);
     textStyle(BOLD);
     fill(250, 204, 21);
-    text("POOP FLY", width / 2, cardY + 22);
+    text("POOP FLY", width / 2, cardY + 18);
 
-    textSize(13);
+    // All-time best score badge in menu
+    fill(250, 204, 21);
+    textSize(14);
+    textStyle(BOLD);
+    text("🏆 ALL-TIME BEST SCORE: " + bestScore, width / 2, cardY + 66);
+
+    textSize(12);
     textStyle(NORMAL);
     fill(203, 213, 225);
-    text("Survive, eat treats, splat enemies & explore connected rooms!", width / 2, cardY + 74);
+    text("Survive, eat treats, splat enemies & explore connected rooms!", width / 2, cardY + 88);
 
     // Animated Fly Icon
     push();
@@ -553,10 +602,15 @@ function drawMenu() {
         text("🎮 WASD or Arrow Keys to steer  •  Spacebar to Poop", width / 2, cardY + 344);
     }
 
-    fill(148, 163, 184);
+    fill(56, 189, 248);
     textSize(12);
+    textStyle(BOLD);
+    text("🗺️ SCORE MULTIPLIER: Final score is multiplied by total areas found (up to 7x)!", width / 2, cardY + 368);
+
+    fill(148, 163, 184);
+    textSize(11);
     textStyle(NORMAL);
-    text("⏱ Survive for +10 score per second!", width / 2, cardY + 368);
+    text("⏱ Survive for +10 score/sec  •  Defeat enemies for bonus points", width / 2, cardY + 392);
 
     pop();
 }
@@ -607,11 +661,11 @@ function handleMenuClick() {
 }
 
 function handleGameOverClick() {
-    let cardH = 340;
+    let cardH = 410;
     let cardY = height / 2 - cardH / 2;
-    let btnW = 220;
+    let btnW = 240;
     let btnH = 46;
-    let restartBtn = { x: width / 2 - btnW / 2, y: cardY + 195, w: btnW, h: btnH };
+    let restartBtn = { x: width / 2 - btnW / 2, y: cardY + 284, w: btnW, h: btnH };
     if (mouseX >= restartBtn.x && mouseX <= restartBtn.x + restartBtn.w && mouseY >= restartBtn.y && mouseY <= restartBtn.y + restartBtn.h) {
         startGame();
     }
@@ -755,39 +809,88 @@ function drawGameOver() {
     rect(0, 0, width, height);
 
     push();
-    let cardW = min(480, width - 40);
-    let cardH = 340;
+    let cardW = min(500, width - 40);
+    let cardH = 410;
     let cardX = width / 2 - cardW / 2;
     let cardY = height / 2 - cardH / 2;
 
-    fill(15, 23, 42, 240);
-    stroke(239, 68, 68, 180);
-    strokeWeight(2);
+    fill(15, 23, 42, 245);
+    stroke(isNewBestScore ? color(250, 204, 21, 220) : color(239, 68, 68, 180));
+    strokeWeight(isNewBestScore ? 2.5 : 2);
     rect(cardX, cardY, cardW, cardH, 16);
 
     // Title
     textAlign(CENTER, TOP);
-    textSize(38);
+    textSize(34);
     textStyle(BOLD);
     fill(239, 68, 68);
-    text("SWATTED!", width / 2, cardY + 30);
+    text("SWATTED!", width / 2, cardY + 20);
 
-    // Stats
-    fill(241, 245, 249);
-    textSize(24);
+    // Best Score Record or Target
+    if (isNewBestScore) {
+        fill(234, 179, 8, 40);
+        stroke(250, 204, 21, 220);
+        strokeWeight(1.5);
+        rect(width / 2 - 160, cardY + 58, 320, 26, 13);
+        noStroke();
+        fill(250, 204, 21);
+        textSize(12);
+        textStyle(BOLD);
+        textAlign(CENTER, CENTER);
+        text("🏆 ★ NEW ALL-TIME BEST SCORE! ★ 🏆", width / 2, cardY + 71);
+    } else {
+        noStroke();
+        fill(148, 163, 184);
+        textSize(12);
+        textStyle(NORMAL);
+        textAlign(CENTER, CENTER);
+        text("🏆 All-Time Best Score: " + bestScore, width / 2, cardY + 71);
+    }
+
+    // Large Multiplied Final Score
+    textAlign(CENTER, TOP);
+    fill(203, 213, 225);
+    textSize(11);
     textStyle(BOLD);
-    text(\`Final Score: \${score}\`, width / 2, cardY + 95);
+    text("TOTAL MULTIPLIED SCORE", width / 2, cardY + 96);
+
+    fill(250, 204, 21);
+    textSize(36);
+    textStyle(BOLD);
+    text(score, width / 2, cardY + 112);
+
+    // Score Multiplier Breakdown Card
+    let boxW = cardW - 48;
+    let boxH = 96;
+    let boxX = width / 2 - boxW / 2;
+    let boxY = cardY + 162;
+
+    fill(30, 41, 59, 210);
+    stroke(71, 85, 105, 170);
+    strokeWeight(1);
+    rect(boxX, boxY, boxW, boxH, 10);
+
+    noStroke();
+    textAlign(CENTER, TOP);
+    fill(226, 232, 240);
+    textSize(13);
+    textStyle(NORMAL);
+    text("Base Score: " + baseScore + " pts  (Survival & Splats)", width / 2, boxY + 10);
+
+    fill(56, 189, 248);
+    textSize(14);
+    textStyle(BOLD);
+    text("× Areas Discovered: " + areasMultiplier + " of 7  ➔  " + areasMultiplier + "x Multiplier!", width / 2, boxY + 36);
 
     fill(148, 163, 184);
-    textSize(14);
+    textSize(12);
     textStyle(NORMAL);
-    let roomsVisited = new Set(levelHistory).size;
-    text(\`Survived: \${survivalSeconds}s (+\${survivalSeconds * 10} pts)  •  Rooms: \${roomsVisited} of 7\`, width / 2, cardY + 135);
+    text("⏱ Survived: " + survivalSeconds + "s (+" + (survivalSeconds * 10) + " pts)  •  Best: " + bestScore, width / 2, boxY + 66);
 
     // Restart Button
-    let btnW = 220;
+    let btnW = 240;
     let btnH = 46;
-    let restartBtn = { x: width / 2 - btnW / 2, y: cardY + 195, w: btnW, h: btnH };
+    let restartBtn = { x: width / 2 - btnW / 2, y: cardY + 284, w: btnW, h: btnH };
     let isHoverRestart = (mouseX > restartBtn.x && mouseX < restartBtn.x + restartBtn.w && mouseY > restartBtn.y && mouseY < restartBtn.y + restartBtn.h);
 
     fill(isHoverRestart ? '#22c55e' : '#16a34a');
@@ -800,9 +903,11 @@ function drawGameOver() {
     textAlign(CENTER, CENTER);
     text("FLY AGAIN", width / 2, restartBtn.y + btnH / 2);
 
-    if (mouseIsPressed && isHoverRestart) {
-        startGame();
-    }
+    fill(148, 163, 184);
+    textSize(12);
+    textStyle(NORMAL);
+    textAlign(CENTER, TOP);
+    text("[ Press SPACE or Click to Restart ]", width / 2, cardY + 348);
 
     pop();
 }

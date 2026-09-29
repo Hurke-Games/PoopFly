@@ -482,15 +482,16 @@ function drawArrivalBanner() {
     // Location Name
     noStroke();
     fill(255, 255, 255, fadeAlpha);
-    textSize(20);
+    textSize(19);
     textStyle(BOLD);
-    text(locInfo.name.toUpperCase(), width / 2, boxY + 8);
+    text(locInfo.name.toUpperCase(), width / 2, boxY + 7);
 
-    // Subtitle tagline
+    // Subtitle tagline with area count & multiplier
     fill(200, 220, 245, fadeAlpha * 0.9);
-    textSize(13);
+    textSize(12);
     textStyle(NORMAL);
-    text(locInfo.tag, width / 2, boxY + 34);
+    let areaCount = (typeof discoveredAreas !== 'undefined') ? discoveredAreas.size : 1;
+    text(\`\${locInfo.tag}  •  🗺️ Area \${areaCount}/7 (x\${areaCount} End Multiplier)\`, width / 2, boxY + 33);
     pop();
 }
 `;

@@ -4,9 +4,40 @@ export const CORE_CODE = `
 let gameState = 'MENU'; // MENU, SETTINGS, PLAYING, TRANSITION, GAME_OVER
 let currentLevel = 1;
 let score = 0;
+let baseScore = 0;
+let finalScore = 0;
+let areasMultiplier = 1;
+let isNewBestScore = false;
 let scrollX = 0;
 let levelHistory = [];
+let discoveredAreas = new Set([1]);
 let frameCounter = 0;
+
+// High score persistence with safe fallback
+function getStoredBestScore() {
+    try {
+        let val = localStorage.getItem('poopfly_best_score');
+        return val ? parseInt(val, 10) || 0 : 0;
+    } catch (e) {
+        return 0;
+    }
+}
+
+let bestScore = getStoredBestScore();
+
+function saveBestScore(newBest) {
+    bestScore = newBest;
+    try {
+        localStorage.setItem('poopfly_best_score', String(bestScore));
+    } catch (e) {
+        // Fallback if local storage restricted
+    }
+    try {
+        if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: 'POOPFLY_BEST_SCORE_UPDATE', bestScore: bestScore }, '*');
+        }
+    } catch (e) {}
+}
 
 // ----- GAME OBJECTS & ARRAYS -----
 let fly;
